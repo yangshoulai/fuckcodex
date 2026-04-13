@@ -59,11 +59,6 @@ class GmailService(BaseMailService):
                                      verification_code_regex: re.Pattern | None = None) -> str:
         """
         获取最近一次验证码。
-
-        mail_filter 回调入参顺序固定为：
-        1) from（发件人）
-        2) subject（邮件主题）
-        3) receive_at（yyyy-mm-dd HH:mm:ss）
         """
         messages = self.get_latest_emails(mail_box, mail_filter, client, verification_code_regex)
         if messages:
@@ -88,11 +83,18 @@ class GmailService(BaseMailService):
                 mail_from = self._extract_from(message)
                 subject = self._extract_subject(message)
                 receive_at = self._format_receive_at(message)
-                if mail_filter and not mail_filter(mail_from, subject, receive_at):
-                    continue
                 content = self.extract_text_from_message(message)
                 verification_code = self._extract_verification_code(message, verification_code_regex)
-                messages.append(Mail(sender=mail_from, subject=subject, receive_at=receive_at, content=content, verification_code=verification_code))
+                mail = Mail(
+                    sender=mail_from,
+                    subject=subject,
+                    receive_at=receive_at,
+                    content=content,
+                    verification_code=verification_code,
+                )
+                if mail_filter and not mail_filter(mail):
+                    continue
+                messages.append(mail)
         return messages
 
     def get_target_mailbox_latest_verification_code(self, target_mail_box: str, mail_box: MailBox, mail_filter: MailFilter | None = None,

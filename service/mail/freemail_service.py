@@ -71,10 +71,6 @@ class FreeMailService(BaseMailService):
     #     """
     #     获取最新验证码。
     #
-    #     mail_filter 回调入参顺序严格为：
-    #     1) from（邮件发送者）
-    #     2) subject（邮件主题）
-    #     3) receive_at（yyyy-mm-dd HH:mm:ss）
     #     """
     #     messages: list[Mail] = self.get_latest_emails(mail_box, mail_filter, verification_code_regex)
     #     if messages:
@@ -91,13 +87,18 @@ class FreeMailService(BaseMailService):
         mail_items = self._fetch_latest_emails(mail_box.email)
         messages = []
         for item in mail_items:
-            if (not mail_filter) or mail_filter(item.sender, item.subject, item.received_at):
-                verification_code = item.verification_code
-                if not verification_code:
-                    verification_code = self.extract_verification_code([item.subject, item.preview], verification_code_regex)
-                messages.append(
-                    Mail(sender=item.sender, subject=item.subject, receive_at=item.received_at, content=self._fetch_email_content(item.id),
-                         verification_code=verification_code))
+            verification_code = item.verification_code
+            if not verification_code:
+                verification_code = self.extract_verification_code([item.subject, item.preview], verification_code_regex)
+            mail = Mail(
+                sender=item.sender,
+                subject=item.subject,
+                receive_at=item.received_at,
+                content=self._fetch_email_content(item.id),
+                verification_code=verification_code,
+            )
+            if (not mail_filter) or mail_filter(mail):
+                messages.append(mail)
         return messages
 
     def _fetch_latest_emails(self, email_address: str) -> list[FreeMailEmailSummary]:

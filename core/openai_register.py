@@ -1,6 +1,5 @@
 import asyncio
 import errno
-import inspect
 import json
 import os
 import shlex
@@ -17,7 +16,7 @@ from pydoll.browser.options import ChromiumOptions
 from pydoll.browser.tab import Tab
 from pydoll.constants import Key
 
-from service.base_mail_service import MailBox, BaseMailService
+from service.base_mail_service import Mail, MailBox, BaseMailService
 from service.config_service import ConfigService, OpenAIRegisterConfig
 from service.cpa_service import CpaService
 from service.http_service import HttpService
@@ -175,7 +174,7 @@ class OpenAIRegister:
         app_config = ConfigService.load(config_file)
         http_service = HttpService(app_config.http)
         mail_provider = create_mail_service(app_config, app_config.openai_register.mail_provider, http_service=http_service)
-        cpa_service = CpaService.from_config_file(config_file) if app_config.openai_register.upload_cpa_auth_file else None
+        cpa_service = CpaService(app_config.cpa, http_service) if app_config.openai_register.upload_cpa_auth_file else None
 
         return cls(
             config=app_config.openai_register,
@@ -224,12 +223,12 @@ class OpenAIRegister:
         deadline = time.time() + timeout_sec + 5
         LOGGER.info(f"开始轮询验证码 => 5s 间隔，{timeout_sec}s 超时")
 
-        def mail_filter(mail_from: str, subject: str, receive_at: str) -> bool:
-            if not "openai.com" in mail_from:
+        def mail_filter(mail: Mail) -> bool:
+            if not mail.sender or "openai.com" not in mail.sender:
                 return False
-            if (not receive_at) or receive_at < received_after:
+            if (not mail.receive_at) or mail.receive_at < received_after:
                 return False
-            if (not "ChatGPT" in subject) and (not "OpenAI" in subject):
+            if (not mail.subject) or (("ChatGPT" not in mail.subject) and ("OpenAI" not in mail.subject)):
                 return False
             return True
 

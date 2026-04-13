@@ -10,7 +10,7 @@ from pydoll.browser import Chrome
 from pydoll.browser.options import ChromiumOptions
 from pydoll.browser.tab import Tab
 
-from service.base_mail_service import BaseMailService, MailBox
+from service.base_mail_service import BaseMailService, Mail, MailBox
 from service.config_service import GrokRegisterConfig, ConfigService
 from service.http_service import HttpService
 from service.mail import mail_factory
@@ -66,10 +66,10 @@ class GrokRegister:
         deadline = time.time() + timeout_sec + 5
         LOGGER.info(f"开始轮询验证码 => 5s 间隔，{timeout_sec}s 超时")
 
-        def mail_filter(mail_from: str, subject: str, receive_at: str) -> bool:
-            if (not receive_at) or receive_at < received_after:
+        def mail_filter(mail: Mail) -> bool:
+            if (not mail.receive_at) or mail.receive_at < received_after:
                 return False
-            if not "xAI confirmation code" in subject:
+            if not mail.subject or "xAI confirmation code" not in mail.subject:
                 return False
             return True
 

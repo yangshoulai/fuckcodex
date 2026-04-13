@@ -1,17 +1,17 @@
-"""兼容层：保留历史导入路径 `service.config_service`。"""
-
 from __future__ import annotations
 
-from .config import (
-    AppConfig,
-    ConfigError,
-    ConfigService,
-    CpaConfig,
+from .constants import (
     DEFAULT_GMAIL_SCOPES,
     DEFAULT_HTTP_IMPERSONATE,
     DEFAULT_HTTP_USER_AGENT,
     DEFAULT_OPENAI_REGISTER_CLIENT_ID,
     DEFAULT_QWEN_REGISTER_CLIENT_ID,
+)
+from .errors import ConfigError
+from .loader import ConfigService
+from .models import (
+    AppConfig,
+    CpaConfig,
     DuckMailConfig,
     FirefoxRelayConfig,
     FreeMailConfig,
@@ -25,15 +25,15 @@ from .config import (
 )
 
 __all__ = [
-    "AppConfig",
-    "ConfigError",
-    "ConfigService",
-    "CpaConfig",
     "DEFAULT_GMAIL_SCOPES",
     "DEFAULT_HTTP_IMPERSONATE",
     "DEFAULT_HTTP_USER_AGENT",
     "DEFAULT_OPENAI_REGISTER_CLIENT_ID",
     "DEFAULT_QWEN_REGISTER_CLIENT_ID",
+    "ConfigError",
+    "ConfigService",
+    "AppConfig",
+    "CpaConfig",
     "DuckMailConfig",
     "FirefoxRelayConfig",
     "FreeMailConfig",

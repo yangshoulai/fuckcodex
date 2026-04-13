@@ -14,7 +14,7 @@ from pydoll.browser import Chrome
 from pydoll.browser.options import ChromiumOptions
 from pydoll.browser.tab import Tab
 
-from service.base_mail_service import BaseMailService, MailBox
+from service.base_mail_service import BaseMailService, Mail, MailBox
 from service.config_service import ConfigService, QwenRegisterConfig
 from service.cpa_service import CpaService
 from service.http_service import HttpService
@@ -41,7 +41,7 @@ class QwenRegister:
         app_config = ConfigService.load(config_file)
         http_service = HttpService(app_config.http)
         mail_provider = mail_factory.create_mail_service(app_config, app_config.qwen_register.mail_provider, http_service=http_service)
-        cpa_service = CpaService(app_config.cpa, http_service)
+        cpa_service = CpaService(app_config.cpa, http_service) if app_config.qwen_register.upload_cpa_auth_file else None
 
         return cls(
             config=app_config.qwen_register,
@@ -76,12 +76,12 @@ class QwenRegister:
         deadline = time.time() + timeout_sec + 5
         LOGGER.info(f"开始轮询验证链接 => 5s 间隔，{timeout_sec}s 超时")
 
-        def mail_filter(mail_from: str, subject: str, receive_at: str) -> bool:
-            if not "qwen" in mail_from:
+        def mail_filter(mail: Mail) -> bool:
+            if not mail.sender or "qwen" not in mail.sender:
                 return False
-            if (not receive_at) or receive_at < received_after:
+            if (not mail.receive_at) or mail.receive_at < received_after:
                 return False
-            if not "qwen" in subject:
+            if not mail.subject or "qwen" not in mail.subject:
                 return False
             return True
 

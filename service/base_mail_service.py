@@ -1,8 +1,8 @@
+from __future__ import annotations
+
 import re
 from dataclasses import dataclass
 from typing import Callable, Dict, Any
-
-MailFilter = Callable[[str, str, str], bool]
 
 
 @dataclass
@@ -18,6 +18,9 @@ class Mail:
     receive_at: str | None
     content: str | None
     verification_code: str | None = None
+
+
+MailFilter = Callable[[Mail], bool]
 
 
 _OTP_PATTERN = re.compile(r"(?<!\d)\d{4,8}(?!\d)")

@@ -93,13 +93,17 @@ class LuckMailService(BaseMailService):
 
         data = self._request_json(method="GET", path=f"/email/token/{clean_token}/mails", use_api_key=False)
         mails = data.get("mails", [])
-        messages: list[Any] = []
+        messages: list[Mail] = []
         for mail in mails:
-            if (not filter) or mail_filter(mail.get("from"), mail.get("subject"), mail.get("received_at")):
-                verification_code = self.extract_verification_code([mail.get("subject"), mail.get("body")], verification_code_regex)
-
-                messages.append(Mail(sender=mail.get("from"), subject=mail.get("subject"), receive_at=mail.get("received_at"), content=mail.get("body"),
-                                     verification_code=verification_code))
+            parsed_mail = Mail(
+                sender=mail.get("from"),
+                subject=mail.get("subject"),
+                receive_at=mail.get("received_at"),
+                content=mail.get("body"),
+                verification_code=self.extract_verification_code([mail.get("subject"), mail.get("body")], verification_code_regex),
+            )
+            if (not mail_filter) or mail_filter(parsed_mail):
+                messages.append(parsed_mail)
         return messages
 
     def _request_json(
