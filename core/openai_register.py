@@ -552,7 +552,7 @@ class OpenAIRegister:
                     auth_file = await self._submit_callback_url(tab, oauth, callback_url)
                     raw_auth_file = json.dumps(auth_file, indent=2, ensure_ascii=False)
                     LOGGER.info(f"获取授权文件成功\n{raw_auth_file}")
-                    file_name = f"{account.email}.json"
+                    file_name = f"codex-{account.email}.json"
                     local_file = self._save_auth_file_to_local(file_name, raw_auth_file)
                     LOGGER.success(f"授权文件已保存到本地：{local_file}")
                     if self._config.upload_cpa_auth_file:
@@ -575,7 +575,7 @@ class OpenAIRegister:
                     try:
                         self._config.auth_file_dir.mkdir(parents=True, exist_ok=True)
                         screenshot_name = account.email if account else datetime.now().strftime('%Y%m%d%H%M%S')
-                        screenshot_file = self._config.auth_file_dir / f"screenshot_{screenshot_name}.png"
+                        screenshot_file = self._config.auth_file_dir / f"screenshot_codex-{screenshot_name}.png"
                         await tab.take_screenshot(screenshot_file, quality=100)
                         LOGGER.info(f"异常截图已保存：{screenshot_file}")
                     except Exception as ex:
@@ -589,4 +589,4 @@ class OpenAIRegister:
 
 
 if __name__ == "__main__":
-    OpenAIRegister.from_config_file().start_sync(50)
+    OpenAIRegister.from_config_file().start_sync(1)

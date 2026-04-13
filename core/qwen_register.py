@@ -291,7 +291,7 @@ class QwenRegister:
                     }
                     raw_auth_file = json.dumps(auth_file_body, indent=2, ensure_ascii=False)
                     LOGGER.success(f"注册成功\n{raw_auth_file}")
-                    file_name = f"{account.email}.json"
+                    file_name = f"qwen-{account.email}.json"
                     local_file = self._save_auth_file_to_local(file_name, raw_auth_file)
                     LOGGER.success(f"账号已保存到本地：{local_file}")
                     if self._config.upload_cpa_auth_file:
@@ -314,7 +314,7 @@ class QwenRegister:
                     try:
                         self._config.auth_file_dir.mkdir(parents=True, exist_ok=True)
                         screenshot_name = account.email if account else datetime.now().strftime('%Y%m%d%H%M%S')
-                        screenshot_file = self._config.auth_file_dir / f"screenshot_{screenshot_name}.png"
+                        screenshot_file = self._config.auth_file_dir / f"screenshot_codex-{screenshot_name}.png"
                         await tab.take_screenshot(screenshot_file, quality=100)
                         LOGGER.info(f"异常截图已保存：{screenshot_file}")
                     except Exception as ex:
@@ -327,4 +327,4 @@ class QwenRegister:
 
 
 if __name__ == "__main__":
-    QwenRegister.from_config_file().start_sync(20)
+    QwenRegister.from_config_file().start_sync(9)
