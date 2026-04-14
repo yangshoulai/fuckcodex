@@ -18,10 +18,17 @@ from .validators import normalize_email
 class HeroSmsConfig:
     """HeroSMS 配置。"""
     api_key: str
-    service_id: str
-    country: int
-    max_price: float | None = None
     api_url: str = "https://hero-sms.com/stubs/handler_api.php"
+
+
+@dataclass(frozen=True)
+class OpenAIHeroSmsConfig:
+    """OpenAI 场景下 HeroSMS 业务参数。"""
+
+    service_id: str
+    country: int = 0
+    max_price: float | None = None
+    phone_number_prefix: str | None = None
 
 
 @dataclass(frozen=True)
@@ -135,6 +142,7 @@ class OpenAIRegisterConfig:
 
     mail_provider: str
     sms_provider: str
+    hero_sms: OpenAIHeroSmsConfig | None = None
     oauth_client_id: str = DEFAULT_OPENAI_REGISTER_CLIENT_ID
     upload_cpa_auth_file: bool = True
     save_screenshot_on_error: bool = True
@@ -204,6 +212,8 @@ class AppConfig:
 
 
 __all__ = [
+    "HeroSmsConfig",
+    "OpenAIHeroSmsConfig",
     "GmailApiConfig",
     "GmailConfig",
     "LuckMailConfig",

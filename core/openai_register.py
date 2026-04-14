@@ -1,4 +1,5 @@
 import asyncio
+import argparse
 import errno
 import json
 import os
@@ -455,11 +456,37 @@ class OpenAIRegister:
                     if index < try_times - 1:
                         LOGGER.info(f"尝试重新获取授权链接")
             except Exception as exc:
-                LOGGER.warning(f"获取授权链接失败：{exc}")
+                LOGGER.warning(f"获取授权链接失败： {exc}")
                 raise exc
         if "/add-phone" in last_url and self._sms_provider:
             # 尝试使用 SMS 验证码
-            pass
+            phone_input = await tab.query("//input[@type='tel']", timeout=10)
+            await phone_input.wait_until(is_visible=True, is_interactable=False, timeout=10)
+            number = self._sms_provider.generate_phone_number()
+            if number:
+                LOGGER.info(f"输入手机号：{number}")
+                await self._ensure_input(tab, "//input[@type='tel']", number)
+                await tab.keyboard.press(Key.TAB)
+                btn_continue = await tab.query("//button[@data-dd-action-name='Continue']", timeout=10)
+                await btn_continue.wait_until(is_visible=True, is_interactable=True, timeout=10)
+                LOGGER.info(f"点击继续按钮")
+                await btn_continue.click(humanize=True)
+                code = await self._sms_provider.get_activation_code(number)
+                if code:
+                    LOGGER.info(f"输入短信验证码：{code}")
+                    await self._ensure_input(tab, "//input[@name='code']", code)
+                    btn_continue = await tab.query("//button[@data-dd-action-name='Continue']", timeout=10)
+                    await btn_continue.wait_until(is_visible=True, is_interactable=True, timeout=10)
+                    LOGGER.info(f"点击继续按钮")
+                    await btn_continue.click(humanize=True)
+                    last_url = await pydoll_util.wait_url(tab, url_flags=["/codex/consent"], timeout_sec=self._config.default_timeout_seconds)
+                    if "/codex/consent" in last_url:
+                        return
+                    else:
+                        LOGGER.warning(f"短信验证失败，未进入同意授权页面，最后访问 URL: {last_url}")
+                else:
+                    LOGGER.warning(f"获取短信验证码失败")
+
         raise RuntimeError("需要手机号" if "/add-phone" in last_url else "无法获取授权链接")
 
     async def _start_oauth(self, tab: Tab, account: Account) -> tuple[OAuthStart, str]:
@@ -598,4 +625,9 @@ class OpenAIRegister:
 
 
 if __name__ == "__main__":
-    OpenAIRegister.from_config_file().start_sync(1)
+    parser = argparse.ArgumentParser(description="OpenAI 注册脚本")
+    parser.add_argument("--config", default="config.toml", help="配置文件路径")
+    parser.add_argument("--count", type=int, default=1, help="注册数量")
+    args = parser.parse_args()
+
+    OpenAIRegister.from_config_file(args.config).start_sync(args.count)

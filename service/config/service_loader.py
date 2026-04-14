@@ -118,13 +118,10 @@ def parse_luckmail_config(services_table: dict[str, Any]) -> LuckMailConfig | No
 
 def parse_herosms_config(services_table: dict[str, Any]) -> HeroSmsConfig | None:
     herosms_table = services_table.get("herosms")
-    max_price = parse_optional_nullable_str(
-        herosms_table.get("max_price"),
-        field_name="services.herosms.max_price",
-        default=None,
-    )
-
-    max_price = float(max_price) if max_price else None
+    if herosms_table is None:
+        return None
+    if not isinstance(herosms_table, dict):
+        raise ConfigError("[services.herosms] 必须是表结构")
 
     return HeroSmsConfig(
         api_key=parse_required_str(
@@ -138,16 +135,6 @@ def parse_herosms_config(services_table: dict[str, Any]) -> HeroSmsConfig | None
             ),
             "services.herosms.api_url",
         ),
-        service_id=parse_required_str(
-            herosms_table.get("service_id"),
-            field_name="services.herosms.service_id",
-        ),
-        country=parse_non_negative_int(
-            herosms_table.get("country"),
-            field_name="services.herosms.country",
-            default=0,
-        ),
-        max_price=max_price,
     )
 
 

@@ -1,4 +1,5 @@
 import asyncio
+import argparse
 import json
 import re
 import time
@@ -238,4 +239,9 @@ class GrokRegister:
 
 
 if __name__ == "__main__":
-    GrokRegister.from_config_file().start_sync(2)
+    parser = argparse.ArgumentParser(description="Grok 注册脚本")
+    parser.add_argument("--config", default="config.toml", help="配置文件路径")
+    parser.add_argument("--count", type=int, default=2, help="注册数量")
+    args = parser.parse_args()
+
+    GrokRegister.from_config_file(args.config).start_sync(args.count)

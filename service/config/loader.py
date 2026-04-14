@@ -87,6 +87,8 @@ class ConfigService:
 
         if "herosms" in sms_providers:
             herosms_config = parse_herosms_config(services_table)
+            if herosms_config is None:
+                raise ConfigError("[services.herosms] 配置项缺失")
 
         return AppConfig(
             gmail=gmail_config,

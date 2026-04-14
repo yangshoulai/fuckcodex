@@ -9,8 +9,9 @@ from .constants import (
     DEFAULT_QWEN_REGISTER_CLIENT_ID,
 )
 from .errors import ConfigError
-from .models import GrokRegisterConfig, OpenAIRegisterConfig, QwenRegisterConfig
+from .models import GrokRegisterConfig, OpenAIHeroSmsConfig, OpenAIRegisterConfig, QwenRegisterConfig
 from .parse_utils import (
+    parse_non_negative_int,
     parse_optional_bool,
     parse_optional_nullable_str,
     parse_optional_path,
@@ -20,6 +21,45 @@ from .parse_utils import (
 )
 
 
+def _parse_openai_hero_sms_config(openai_register_table: dict[str, Any]) -> OpenAIHeroSmsConfig:
+    hero_sms_table = openai_register_table.get("hero_sms")
+    if hero_sms_table is None:
+        raise ConfigError("sms_provider=herosms 时必须配置 [registers.openai.hero_sms]")
+    if not isinstance(hero_sms_table, dict):
+        raise ConfigError("[registers.openai.hero_sms] 必须是表结构")
+
+    raw_max_price = parse_optional_nullable_str(
+        hero_sms_table.get("max_price"),
+        field_name="registers.openai.hero_sms.max_price",
+        default=None,
+    )
+    if raw_max_price is None:
+        max_price = None
+    else:
+        try:
+            max_price = float(raw_max_price)
+        except (TypeError, ValueError) as exc:
+            raise ConfigError("字段 `registers.openai.hero_sms.max_price` 必须是数字字符串") from exc
+
+    return OpenAIHeroSmsConfig(
+        service_id=parse_required_str(
+            hero_sms_table.get("service_id"),
+            field_name="registers.openai.hero_sms.service_id",
+        ),
+        country=parse_non_negative_int(
+            hero_sms_table.get("country"),
+            field_name="registers.openai.hero_sms.country",
+            default=0,
+        ),
+        max_price=max_price,
+        phone_number_prefix=parse_optional_nullable_str(
+            hero_sms_table.get("phone_number_prefix"),
+            field_name="registers.openai.hero_sms.phone_number_prefix",
+            default=None,
+        ),
+    )
+
+
 def parse_openai_register_config(registers_table: dict[str, Any], base_dir: Path) -> OpenAIRegisterConfig:
     openai_register_table = registers_table.get("openai")
     if openai_register_table is None:
@@ -27,11 +67,15 @@ def parse_openai_register_config(registers_table: dict[str, Any], base_dir: Path
     if not isinstance(openai_register_table, dict):
         raise ConfigError("[registers.openai] 必须是表结构")
 
+    sms_provider = parse_required_str(
+        openai_register_table.get("sms_provider"),
+        field_name="registers.openai.sms_provider",
+    )
+    hero_sms_config = _parse_openai_hero_sms_config(openai_register_table) if sms_provider == "herosms" else None
+
     return OpenAIRegisterConfig(
-        sms_provider=parse_required_str(
-            openai_register_table.get("sms_provider"),
-            field_name="registers.openai.sms_provider",
-        ),
+        sms_provider=sms_provider,
+        hero_sms=hero_sms_config,
         mail_provider=parse_required_str(
             openai_register_table.get("mail_provider"),
             field_name="registers.openai.mail_provider",

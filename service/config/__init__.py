@@ -18,8 +18,10 @@ from .models import (
     GmailApiConfig,
     GmailConfig,
     GrokRegisterConfig,
+    HeroSmsConfig,
     HttpConfig,
     LuckMailConfig,
+    OpenAIHeroSmsConfig,
     OpenAIRegisterConfig,
     QwenRegisterConfig,
 )
@@ -40,8 +42,10 @@ __all__ = [
     "GmailApiConfig",
     "GmailConfig",
     "GrokRegisterConfig",
+    "HeroSmsConfig",
     "HttpConfig",
     "LuckMailConfig",
+    "OpenAIHeroSmsConfig",
     "OpenAIRegisterConfig",
     "QwenRegisterConfig",
 ]

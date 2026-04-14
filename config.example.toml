@@ -102,6 +102,12 @@ csrf_token = "<Firefox Relay CSRF Token>"
 # Firefox Relay 邮件转发到的 Gmail 地址
 forward_gmail = "<用于接收 Firefox Relay 转发的 Gmail 地址>"
 
+[services.herosms]
+# HeroSMS API Key
+api_key = "<HeroSMS API Key>"
+# HeroSMS 接口地址
+api_url = "https://hero-sms.com/stubs/handler_api.php"
+
 [registers.openai]
 # OpenAI OAuth 客户端 ID
 oauth_client_id = "app_EMoamEEZ73f0CkXaXp7hrann"
@@ -129,8 +135,20 @@ upload_cpa_auth_file = true
 save_screenshot_on_error = true
 # 邮箱服务，当前支持：luckmail / freemail / gmail / duckmail / firefoxrelay
 mail_provider = "gmail"
+# 短信服务，当前支持：herosms
+sms_provider = "herosms"
 # 注册账号时使用的默认密码（留空表示运行时随机生成）
 default_account_password = "<默认注册密码，可留空>"
+
+[registers.openai.hero_sms]
+# HeroSMS 服务 ID（不同平台/业务不同）
+service_id = "<HeroSMS 服务 ID>"
+# 国家代码（0 代表任意国家）
+country = 0
+# 最高价格（可留空）
+max_price = ""
+# 手机号前缀过滤（可留空），例如 "+52" / "+1"
+phone_number_prefix = ""
 
 [registers.grok]
 # 默认页面 / 接口等待超时（秒）

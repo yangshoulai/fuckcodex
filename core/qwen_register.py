@@ -1,4 +1,5 @@
 import asyncio
+import argparse
 import base64
 import hashlib
 import html
@@ -327,4 +328,9 @@ class QwenRegister:
 
 
 if __name__ == "__main__":
-    QwenRegister.from_config_file().start_sync(9)
+    parser = argparse.ArgumentParser(description="Qwen 注册脚本")
+    parser.add_argument("--config", default="config.toml", help="配置文件路径")
+    parser.add_argument("--count", type=int, default=9, help="注册数量")
+    args = parser.parse_args()
+
+    QwenRegister.from_config_file(args.config).start_sync(args.count)

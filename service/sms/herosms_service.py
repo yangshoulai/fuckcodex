@@ -16,16 +16,38 @@ class HeroSmsService(BaseSmsService):
         self._config = config
         self._http_service = http_service
 
-    def generate_phone_number(self) -> dict[str, Any] | None:
+    def generate_phone_number(
+            self,
+            *,
+            service_id: str | None = None,
+            country: int = 0,
+            max_price: float | None = None,
+            phone_number_prefix: str | None = None,
+    ) -> dict[str, Any] | None:
+        if not service_id:
+            raise ValueError("generate_phone_number 缺少 service_id")
+
         try:
             _params = {
                 "action": "getNumberV2",
-                "service": self._config.service_Id,
-                "country": self._config.country,
+                "service": service_id,
+                "country": country,
             }
-            if self._config.max_price:
-                _params["maxPrice"] = self._config.max_price
-            return self._get(params=_params)
+            if max_price is not None:
+                _params["maxPrice"] = max_price
+
+            phone_number = self._get(params=_params)
+            if phone_number_prefix:
+                full_number = (
+                        phone_number.get("phoneNumber")
+                        or phone_number.get("phone_number")
+                        or phone_number.get("number")
+                        or ""
+                )
+                if full_number and not str(full_number).startswith(phone_number_prefix):
+                    LOGGER.info(f"手机号前缀不匹配，期望前缀={phone_number_prefix}，实际手机号={full_number}")
+                    return None
+            return phone_number
         except Exception as exc:
             LOGGER.warning(f"购买手机号异常：{str(exc)}")
             return None
@@ -46,8 +68,9 @@ class HeroSmsService(BaseSmsService):
         _params = params or {}
         _params["api_key"] = self._config.api_key
         resp = self._http_service.get(self._config.api_url, params=_params, raise_for_status=True)
-        if self.is_json(resp.text):
-            return resp.json()
+        is_json, payload = self.is_json(resp.text)
+        if is_json and isinstance(payload, dict):
+            return payload
         raise ValueError(resp.text)
 
     @staticmethod
