@@ -17,10 +17,12 @@ from pydoll.browser.tab import Tab
 from pydoll.constants import Key
 
 from service.base_mail_service import Mail, MailBox, BaseMailService
+from service.base_sms_service import BaseSmsService
 from service.config_service import ConfigService, OpenAIRegisterConfig
 from service.cpa_service import CpaService
 from service.http_service import HttpService
 from service.mail.mail_factory import create_mail_service
+from service.sms.sms_factory import create_sms_service
 from util import openai_register_util, pydoll_util
 from util.account_util import Account, create_new_account
 from util.logger import get_logger
@@ -160,6 +162,7 @@ class OpenAIRegister:
             self,
             config: OpenAIRegisterConfig,
             mail_provider: BaseMailService,
+            sms_provider: BaseSmsService | None,
             cpa_service: CpaService | None,
             http_service: HttpService
     ):
@@ -167,6 +170,7 @@ class OpenAIRegister:
         self._mail_provider = mail_provider
         self._cpa_service = cpa_service
         self._http_service = http_service
+        self._sms_provider = sms_provider
 
     @classmethod
     def from_config_file(cls, config_file: str | Path = "config.toml") -> "OpenAIRegister":
@@ -176,11 +180,15 @@ class OpenAIRegister:
         mail_provider = create_mail_service(app_config, app_config.openai_register.mail_provider, http_service=http_service)
         cpa_service = CpaService(app_config.cpa, http_service) if app_config.openai_register.upload_cpa_auth_file else None
 
+        sms_provider = create_sms_service(app_config, app_config.openai_register.sms_provider,
+                                          http_service=http_service) if app_config.openai_register.sms_provider else None
+
         return cls(
             config=app_config.openai_register,
             mail_provider=mail_provider,
             cpa_service=cpa_service,
-            http_service=http_service
+            http_service=http_service,
+            sms_provider=sms_provider
         )
 
     def _build_chrome_options(self) -> ChromiumOptions:
@@ -449,7 +457,9 @@ class OpenAIRegister:
             except Exception as exc:
                 LOGGER.warning(f"获取授权链接失败：{exc}")
                 raise exc
-
+        if "/add-phone" in last_url and self._sms_provider:
+            # 尝试使用 SMS 验证码
+            pass
         raise RuntimeError("需要手机号" if "/add-phone" in last_url else "无法获取授权链接")
 
     async def _start_oauth(self, tab: Tab, account: Account) -> tuple[OAuthStart, str]:

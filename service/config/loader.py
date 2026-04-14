@@ -19,6 +19,7 @@ from .service_loader import (
     parse_gmail_config,
     parse_http_config,
     parse_luckmail_config,
+    parse_herosms_config,
 )
 from .errors import ConfigError
 
@@ -79,6 +80,14 @@ class ConfigService:
             firefoxrelay_config = parse_firefoxrelay_config(services_table)
             gmail_config = parse_gmail_config(services_table, base_dir=base_dir)
 
+        sms_providers = {
+            openai_register_config.sms_provider
+        }
+        herosms_config = None
+
+        if "herosms" in sms_providers:
+            herosms_config = parse_herosms_config(services_table)
+
         return AppConfig(
             gmail=gmail_config,
             luckmail=luckmail_config,
@@ -90,6 +99,7 @@ class ConfigService:
             openai_register=openai_register_config,
             grok_register=grok_register_config,
             qwen_register=qwen_register_config,
+            herosms=herosms_config,
         )
 
 

@@ -13,7 +13,7 @@ from .models import (
     GmailApiConfig,
     GmailConfig,
     HttpConfig,
-    LuckMailConfig,
+    LuckMailConfig, HeroSmsConfig,
 )
 from .parse_utils import (
     parse_email,
@@ -35,9 +35,9 @@ from .validators import normalize_base_url
 
 
 def parse_gmail_config_from_gmail_table(
-    services_table: dict[str, Any],
-    base_dir: Path,
-    config_prefix: str = "services",
+        services_table: dict[str, Any],
+        base_dir: Path,
+        config_prefix: str = "services",
 ) -> GmailConfig:
     gmail_table = require_table(services_table, "gmail", full_name=f"{config_prefix}.gmail")
     gmail_api_table = require_table(gmail_table, "api", full_name=f"{config_prefix}.gmail.api")
@@ -113,6 +113,41 @@ def parse_luckmail_config(services_table: dict[str, Any]) -> LuckMailConfig | No
             luckmail_table.get("domain"),
             field_name="services.luckmail.domain",
         ),
+    )
+
+
+def parse_herosms_config(services_table: dict[str, Any]) -> HeroSmsConfig | None:
+    herosms_table = services_table.get("herosms")
+    max_price = parse_optional_nullable_str(
+        herosms_table.get("max_price"),
+        field_name="services.herosms.max_price",
+        default=None,
+    )
+
+    max_price = float(max_price) if max_price else None
+
+    return HeroSmsConfig(
+        api_key=parse_required_str(
+            herosms_table.get("api_key"),
+            field_name="services.herosms.api_key",
+        ),
+        api_url=normalize_base_url(
+            parse_required_str(
+                herosms_table.get("api_url"),
+                field_name="services.herosms.api_url",
+            ),
+            "services.herosms.api_url",
+        ),
+        service_id=parse_required_str(
+            herosms_table.get("service_id"),
+            field_name="services.herosms.service_id",
+        ),
+        country=parse_non_negative_int(
+            herosms_table.get("country"),
+            field_name="services.herosms.country",
+            default=0,
+        ),
+        max_price=max_price,
     )
 
 

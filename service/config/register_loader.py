@@ -28,6 +28,10 @@ def parse_openai_register_config(registers_table: dict[str, Any], base_dir: Path
         raise ConfigError("[registers.openai] 必须是表结构")
 
     return OpenAIRegisterConfig(
+        sms_provider=parse_required_str(
+            openai_register_table.get("sms_provider"),
+            field_name="registers.openai.sms_provider",
+        ),
         mail_provider=parse_required_str(
             openai_register_table.get("mail_provider"),
             field_name="registers.openai.mail_provider",
