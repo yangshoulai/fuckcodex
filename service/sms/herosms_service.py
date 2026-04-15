@@ -49,7 +49,7 @@ class HeroSmsService(BaseSmsService):
                 "id": activation_id
             }
             resp = self._get(params=_params)
-            if resp and "sms" in resp and "code" in resp["sms"]:
+            if resp and "sms" in resp and resp["sms"] and "code" in resp["sms"]:
                 return self._get(params=_params).get("sms").get("code")
             return ""
         except Exception as exc:
