@@ -1,5 +1,5 @@
-import asyncio
 import argparse
+import asyncio
 import errno
 import json
 import os
@@ -182,6 +182,7 @@ class OpenAIRegister:
         cpa_service = CpaService(app_config.cpa, http_service) if app_config.openai_register.upload_cpa_auth_file else None
 
         sms_provider = create_sms_service(app_config, app_config.openai_register.sms_provider,
+                                          register_sms_config=app_config.openai_register.sms_config,
                                           http_service=http_service) if app_config.openai_register.sms_provider else None
 
         return cls(
@@ -226,6 +227,21 @@ class OpenAIRegister:
             return
         current_value = await pydoll_util.get_live_value(expression, tab)
         raise RuntimeError(f"输入 {expression} 失败，当前值={current_value}，目标值={value}")
+
+    async def _wait_for_sms_code(self, phone_number: dict[str, Any], timeout_sec: int = 60) -> str:
+        deadline = time.time() + timeout_sec + 5
+        LOGGER.info(f"开始轮询短信验证码 => 5s 间隔，{timeout_sec}s 超时")
+        while time.time() < deadline:
+            try:
+                code = self._sms_provider.get_activation_code(phone_number)
+                if code:
+                    LOGGER.info(f"获取短信验证码成功: {code}")
+                    return code
+                LOGGER.debug(f"未获取短信验证码")
+            except Exception as exc:
+                LOGGER.warning(f"获取短信验证码失败: {str(exc)[:200]}")
+            await asyncio.sleep(5)
+        return ""
 
     async def _wait_for_verify_code(self, mail_box: MailBox, received_after: str, timeout_sec: int = 60) -> str:
         """轮询 MailService 获取验证码。"""
@@ -366,7 +382,8 @@ class OpenAIRegister:
         LOGGER.info("点击继续按钮")
         await btn_continue.click(humanize=True)
 
-        input_username = await tab.query("//input[@name='name']", raise_exc=False, timeout=self._config.default_timeout_seconds)
+        url, input_username = await pydoll_util.wait_url_or_element(tab, url_flags=["https://chatgpt.com"], ele_selectors=["//input[@name='name']"],
+                                                                    raise_exc=False, timeout_sec=self._config.default_timeout_seconds)
         # 直接注册成功，不出现用户名输入框
         if input_username:
             await input_username.wait_until(is_visible=True, is_interactable=False, timeout=10)
@@ -397,7 +414,7 @@ class OpenAIRegister:
         LOGGER.info("账号注册成功")
         return account
 
-    async def _try_get_consent_url(self, tab: Tab, account: Account, oauth: OAuthStart, try_times: int = 2) -> None:
+    async def _try_get_consent_url(self, tab: Tab, account: Account, oauth: OAuthStart, try_times: int = 2) -> bool:
         """执行 OAuth 授权页登录流程。"""
 
         last_url = ""
@@ -450,7 +467,7 @@ class OpenAIRegister:
 
                 last_url = await pydoll_util.wait_url(tab, url_flags=["/codex/consent", "/add-phone"], timeout_sec=self._config.default_timeout_seconds)
                 if "/add-phone" not in last_url:
-                    return
+                    return False
                 else:
                     LOGGER.info(f"需要验证手机")
                     if index < try_times - 1:
@@ -463,38 +480,53 @@ class OpenAIRegister:
             phone_input = await tab.query("//input[@type='tel']", timeout=10)
             await phone_input.wait_until(is_visible=True, is_interactable=False, timeout=10)
             number = self._sms_provider.generate_phone_number()
-            if number:
-                LOGGER.info(f"输入手机号：{number}")
-                await self._ensure_input(tab, "//input[@type='tel']", number)
+            if number and "phoneNumber" in number:
+                LOGGER.info(f"输入手机号：{number["phoneNumber"]}")
+                await phone_input.type_text("+" + number["phoneNumber"])
+
                 await tab.keyboard.press(Key.TAB)
                 btn_continue = await tab.query("//button[@data-dd-action-name='Continue']", timeout=10)
                 await btn_continue.wait_until(is_visible=True, is_interactable=True, timeout=10)
                 LOGGER.info(f"点击继续按钮")
                 await btn_continue.click(humanize=True)
-                code = await self._sms_provider.get_activation_code(number)
-                if code:
-                    LOGGER.info(f"输入短信验证码：{code}")
-                    await self._ensure_input(tab, "//input[@name='code']", code)
-                    btn_continue = await tab.query("//button[@data-dd-action-name='Continue']", timeout=10)
-                    await btn_continue.wait_until(is_visible=True, is_interactable=True, timeout=10)
-                    LOGGER.info(f"点击继续按钮")
-                    await btn_continue.click(humanize=True)
-                    last_url = await pydoll_util.wait_url(tab, url_flags=["/codex/consent"], timeout_sec=self._config.default_timeout_seconds)
-                    if "/codex/consent" in last_url:
-                        return
+
+                input_code_or_error = await tab.query("//input[@name='code'] | //*[contains(@class, 'error')]", timeout=self._config.default_timeout_seconds)
+                await input_code_or_error.wait_until(is_visible=True, is_interactable=False, timeout=10)
+                if input_code_or_error.get_attribute("name") == "code":
+                    LOGGER.info(f"等待验证码")
+                    code = await self._wait_for_sms_code(number, timeout_sec=self._config.default_timeout_seconds)
+                    if code:
+                        LOGGER.info(f"输入短信验证码：{code}")
+                        await self._ensure_input(tab, "//input[@name='code']", code)
+                        btn_continue = await tab.query("//button[@data-dd-action-name='Continue']", timeout=10)
+                        await btn_continue.wait_until(is_visible=True, is_interactable=True, timeout=10)
+                        LOGGER.info(f"点击继续按钮")
+                        await btn_continue.click(humanize=True)
+                        last_url, e = await pydoll_util.wait_url_or_element(tab, url_flags=["/codex/consent"], ele_selectors=["//*[contains(@class, 'error')]"],
+                                                                            timeout_sec=self._config.default_timeout_seconds)
+                        if last_url and "/codex/consent" in last_url:
+                            return True
+                        else:
+                            self._sms_provider.cancel_activation(number)
+                            if e:
+                                LOGGER.warning(f"短信验证失败，未进入同意授权页面，异常: {e.inner_html}")
+                            else:
+                                LOGGER.warning(f"短信验证失败，未进入同意授权页面，最后访问 URL: {last_url}")
                     else:
-                        LOGGER.warning(f"短信验证失败，未进入同意授权页面，最后访问 URL: {last_url}")
+                        LOGGER.warning(f"获取短信验证码失败")
+                        self._sms_provider.cancel_activation(number)
                 else:
-                    LOGGER.warning(f"获取短信验证码失败")
+                    self._sms_provider.cancel_activation(number)
+                    LOGGER.warning(f"无法获取验证码: {input_code_or_error.inner_html}")
 
         raise RuntimeError("需要手机号" if "/add-phone" in last_url else "无法获取授权链接")
 
-    async def _start_oauth(self, tab: Tab, account: Account) -> tuple[OAuthStart, str]:
+    async def _start_oauth(self, tab: Tab, account: Account) -> tuple[OAuthStart, str, bool]:
         """执行 Codex OAuth 流程。"""
 
         oauth = openai_register_util.generate_oauth_url(self._config.oauth_client_id, self._config.callback_server_port)
         LOGGER.info(f"生成 OAuth 授权链接：{oauth.auth_url}")
-        await self._try_get_consent_url(tab, account=account, oauth=oauth)
+        phone_bypass = await self._try_get_consent_url(tab, account=account, oauth=oauth)
 
         btn_continue = await tab.query("//button[@data-dd-action-name='Continue']", timeout=10)
         await btn_continue.wait_until(is_visible=True, is_interactable=True, timeout=10)
@@ -505,7 +537,7 @@ class OpenAIRegister:
         LOGGER.info("等待回调链接")
         callback_url = await pydoll_util.wait_url(tab, url_flags=[callback_host], timeout_sec=self._config.default_timeout_seconds)
         LOGGER.info(f"成功获取回调链接：{callback_url}")
-        return oauth, callback_url
+        return oauth, callback_url, phone_bypass
 
     @staticmethod
     async def _submit_callback_url(tab: Tab, oauth: OAuthStart, callback_url: str) -> dict[str, Any]:
@@ -583,12 +615,12 @@ class OpenAIRegister:
                     tab = await browser.start()
                     await self._prepare_browser_env(tab)
                     account = await self._start_register(tab)
-                    oauth, callback_url = await self._start_oauth(tab, account)
+                    oauth, callback_url, phone_bypass = await self._start_oauth(tab, account)
                     LOGGER.info("开始提交回调链接")
                     auth_file = await self._submit_callback_url(tab, oauth, callback_url)
                     raw_auth_file = json.dumps(auth_file, indent=2, ensure_ascii=False)
                     LOGGER.info(f"获取授权文件成功\n{raw_auth_file}")
-                    file_name = f"codex-{account.email}.json"
+                    file_name = f"codex{'-phone-bypass' if phone_bypass else ''}-{account.email}.json"
                     local_file = self._save_auth_file_to_local(file_name, raw_auth_file)
                     LOGGER.success(f"授权文件已保存到本地：{local_file}")
                     if self._config.upload_cpa_auth_file:

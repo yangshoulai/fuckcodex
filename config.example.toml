@@ -140,15 +140,13 @@ sms_provider = "herosms"
 # 注册账号时使用的默认密码（留空表示运行时随机生成）
 default_account_password = "<默认注册密码，可留空>"
 
-[registers.openai.hero_sms]
+[registers.openai.sms_config]
 # HeroSMS 服务 ID（不同平台/业务不同）
-service_id = "<HeroSMS 服务 ID>"
-# 国家代码（0 代表任意国家）
-country = 0
-# 最高价格（可留空）
-max_price = ""
-# 手机号前缀过滤（可留空），例如 "+52" / "+1"
-phone_number_prefix = ""
+herosms_service_id = "dr"
+# HeroSMS 国家代码（0 代表任意国家）
+herosms_country = 52
+# HeroSMS 最高价格（可留空）
+herosms_max_price = ""
 
 [registers.grok]
 # 默认页面 / 接口等待超时（秒）

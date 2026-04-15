@@ -141,8 +141,8 @@ class OpenAIRegisterConfig:
     """OpenAI 注册服务配置。"""
 
     mail_provider: str
-    sms_provider: str
-    hero_sms: OpenAIHeroSmsConfig | None = None
+    sms_provider: str | None = None
+    sms_config: dict[str, Any] = field(default_factory=dict)
     oauth_client_id: str = DEFAULT_OPENAI_REGISTER_CLIENT_ID
     upload_cpa_auth_file: bool = True
     save_screenshot_on_error: bool = True
