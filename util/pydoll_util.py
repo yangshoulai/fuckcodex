@@ -128,8 +128,7 @@ async def ensure_input(tab: Tab, ele_selector: str, value: str, timeout_sec: int
         input_el = await tab.query(ele_selector, timeout_sec)
         await input_el.focus()
         await input_el.clear()
-        await input_el.type_text(target_value)
-        await asyncio.sleep(0.5)
+        await input_el.type_text(target_value, humanize=True)
         current_value = await get_live_value(input_el)
         if current_value == target_value:
             return True

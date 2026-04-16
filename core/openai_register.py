@@ -345,19 +345,16 @@ class OpenAIRegister:
         """执行 ChatGPT 账号注册。"""
         await tab.go_to("https://chatgpt.com", timeout=self._config.default_timeout_seconds)
         LOGGER.info("访问 https://chatgpt.com")
-        btn_login = await tab.query("//button[@data-testid='login-button']", timeout=10)
-        await btn_login.wait_until(is_visible=True, is_interactable=True, timeout=10)
-        LOGGER.info("点击登录按钮")
-        await btn_login.click(humanize=True)
-
-        input_email = await tab.query("//input[@id='email']", raise_exc=False, timeout=5)
-        if not input_email:
-            LOGGER.warning("未找到邮箱输入框，刷新页面重试")
-            await tab.go_to("https://chatgpt.com", timeout=self._config.default_timeout_seconds)
+        await tab.query("//button[@data-testid='login-button']", timeout=10)
+        input_email = None
+        for i in range(3):
             btn_login = await tab.query("//button[@data-testid='login-button']", timeout=10)
             await btn_login.wait_until(is_visible=True, is_interactable=True, timeout=10)
+            LOGGER.info("点击登录按钮")
             await btn_login.click(humanize=True)
-            input_email = await tab.query("//input[@id='email']", raise_exc=False, timeout=5)
+            input_email = await tab.query("//input[@name='email']", raise_exc=False, timeout=10)
+            if input_email:
+                break
         if not input_email:
             raise RuntimeError("未找到邮箱输入框")
 
