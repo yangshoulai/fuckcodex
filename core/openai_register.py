@@ -678,7 +678,7 @@ class OpenAIRegister:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="OpenAI 注册脚本")
     parser.add_argument("--config", default="config.toml", help="配置文件路径")
-    parser.add_argument("--count", type=int, default=2, help="注册数量")
+    parser.add_argument("--count", type=int, default=1, help="注册数量")
     args = parser.parse_args()
 
     OpenAIRegister.from_config_file(args.config).start_sync(args.count)
