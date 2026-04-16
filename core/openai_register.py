@@ -353,7 +353,7 @@ class OpenAIRegister:
         input_email = await tab.query("//input[@id='email']", raise_exc=False, timeout=5)
         if not input_email:
             LOGGER.warning("未找到邮箱输入框，刷新页面重试")
-            await tab.refresh()
+            await tab.go_to("https://chatgpt.com", timeout=self._config.default_timeout_seconds)
             btn_login = await tab.query("//button[@data-testid='login-button']", timeout=10)
             await btn_login.wait_until(is_visible=True, is_interactable=True, timeout=10)
             await btn_login.click(humanize=True)
