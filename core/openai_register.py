@@ -243,6 +243,25 @@ class OpenAIRegister:
             await asyncio.sleep(5)
         return ""
 
+    async def _wait_for_sms_code_resend_if_needed(self, tab: Tab, phone_number: dict[str, Any]) -> str:
+        btn_resend = await tab.query("//button[@value='resend']", timeout=10, raise_exc=False)
+        if btn_resend:
+            await btn_resend.wait_until(is_visible=True, is_interactable=True, timeout=10)
+            await btn_resend.click(humanize=True)
+        code = await self._wait_for_sms_code(phone_number, self._config.sms_timeout_seconds)
+        if not code:
+            for i in range(self._config.sms_retries):
+                btn_resend = await tab.query("//button[@value='resend']", timeout=10, raise_exc=False)
+                if btn_resend:
+                    await btn_resend.wait_until(is_visible=True, is_interactable=True, timeout=10)
+                    LOGGER.info(f"等待短信验证码超时，将尝试第 {i + 1} 次重新获取验证码")
+                    LOGGER.info("点击重新发送短信验证码")
+                    await btn_resend.click(humanize=True)
+                    code = await self._wait_for_sms_code(phone_number, self._config.sms_timeout_seconds)
+                    if code:
+                        break
+        return code
+
     async def _wait_for_verify_code(self, mail_box: MailBox, received_after: str, timeout_sec: int = 60) -> str:
         """轮询 MailService 获取验证码。"""
         deadline = time.time() + timeout_sec + 5
@@ -494,7 +513,7 @@ class OpenAIRegister:
                 await input_code_or_error.wait_until(is_visible=True, is_interactable=False, timeout=10)
                 if input_code_or_error.get_attribute("name") == "code":
                     LOGGER.info(f"等待验证码")
-                    code = await self._wait_for_sms_code(number, timeout_sec=self._config.default_timeout_seconds)
+                    code = await self._wait_for_sms_code_resend_if_needed(tab, number)
                     if code:
                         LOGGER.info(f"输入短信验证码：{code}")
                         await self._ensure_input(tab, "//input[@name='code']", code)

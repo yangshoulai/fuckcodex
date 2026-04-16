@@ -149,6 +149,8 @@ class OpenAIRegisterConfig:
     default_timeout_seconds: int = 60
     email_timeout_seconds: int = 60
     email_retries: int = 3
+    sms_timeout_seconds: int = 60
+    sms_retries: int = 3
     callback_server_port: int = 1455
     chrome_binary_path: str | None = None
     chrome_proxy: str | None = None

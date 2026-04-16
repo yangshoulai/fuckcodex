@@ -77,6 +77,17 @@ def parse_openai_register_config(registers_table: dict[str, Any], base_dir: Path
             field_name="registers.openai.email_retries",
             default=3,
         ),
+        sms_timeout_seconds=parse_positive_int(
+            openai_register_table.get("sms_timeout_seconds"),
+            field_name="registers.openai.sms_timeout_seconds",
+            default=60,
+        ),
+        sms_retries=parse_positive_int(
+            openai_register_table.get("sms_retries"),
+            field_name="registers.openai.sms_retries",
+            default=3,
+        ),
+
         callback_server_port=parse_positive_int(
             openai_register_table.get("callback_server_port"),
             field_name="registers.openai.callback_server_port",
