@@ -360,6 +360,8 @@ class OpenAIRegister:
             input_email = await tab.query("//input[@name='email']", raise_exc=False, timeout=10)
             if input_email:
                 break
+            else:
+                await tab.go_to("https://chatgpt.com", timeout=self._config.default_timeout_seconds)
         if not input_email:
             raise RuntimeError("未找到邮箱输入框")
 

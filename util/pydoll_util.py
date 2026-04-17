@@ -130,6 +130,9 @@ async def ensure_input(tab: Tab, ele_selector: str, value: str, timeout_sec: int
         await input_el.click(humanize=True)
         await input_el.wait_until(is_visible=True, is_interactable=True, timeout=5)
         await input_el.clear()
+        while await get_live_value(ele_selector, tab):
+            await tab.keyboard.press(Key.BACKSPACE)
+
         await input_el.type_text(target_value, humanize=True)
         await tab.keyboard.press(Key.TAB)
         await asyncio.sleep(0.5)
