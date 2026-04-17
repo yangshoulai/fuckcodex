@@ -4,6 +4,7 @@ import asyncio
 import time
 
 from pydoll.browser.tab import Tab
+from pydoll.constants import Key
 from pydoll.elements.web_element import WebElement
 from pydoll.exceptions import ElementNotFound
 
@@ -126,12 +127,17 @@ async def ensure_input(tab: Tab, ele_selector: str, value: str, timeout_sec: int
     for index in range(try_times):
         # 每轮重查元素，降低 DOM 刷新导致的句柄失效风险。
         input_el = await tab.query(ele_selector, timeout_sec)
-        await input_el.focus()
+        await input_el.click(humanize=True)
+        await input_el.wait_until(is_visible=True, is_interactable=True, timeout=5)
         await input_el.clear()
         await input_el.type_text(target_value, humanize=True)
-        current_value = await get_live_value(input_el)
+        await tab.keyboard.press(Key.TAB)
+        await asyncio.sleep(0.5)
+        current_value = await get_live_value(ele_selector, tab)
         if current_value == target_value:
             return True
+        else:
+            print(f"输入框填入失败，当前值={current_value}，目标值={target_value}，重试第 {index + 1} 次")
     return False
 
 

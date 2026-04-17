@@ -217,8 +217,13 @@ class OpenAIRegister:
     async def _prepare_browser_env(self, tab: Tab):
         oauth = openai_register_util.generate_oauth_url(self._config.oauth_client_id, self._config.callback_server_port)
         LOGGER.info("探测 Cloudflare Turnstile 环境")
-        async with tab.expect_and_bypass_cloudflare_captcha(time_to_wait_captcha=5):
-            await tab.go_to(oauth.auth_url)
+        await tab.enable_auto_solve_cloudflare_captcha()
+        await tab.go_to(oauth.auth_url)
+        await tab.query("//input[@name='email']", timeout=self._config.default_timeout_seconds)
+        await tab.disable_auto_solve_cloudflare_captcha()
+
+        # async with tab.expect_and_bypass_cloudflare_captcha(time_to_wait_captcha=5):
+        #     await tab.go_to(oauth.auth_url)
 
     @staticmethod
     async def _ensure_input(tab: Tab, expression: str, value: str, timeout: int = 10, try_times: int = 3):
@@ -542,7 +547,7 @@ class OpenAIRegister:
 
         oauth = openai_register_util.generate_oauth_url(self._config.oauth_client_id, self._config.callback_server_port)
         LOGGER.info(f"生成 OAuth 授权链接：{oauth.auth_url}")
-        phone_bypass = await self._try_get_consent_url(tab, account=account, oauth=oauth)
+        phone_bypass = await self._try_get_consent_url(tab, account=account, oauth=oauth, try_times=1)
 
         btn_continue = await tab.query("//button[@data-dd-action-name='Continue']", timeout=10)
         await btn_continue.wait_until(is_visible=True, is_interactable=True, timeout=10)
