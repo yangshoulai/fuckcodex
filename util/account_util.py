@@ -62,6 +62,7 @@ class Account:
     birthday: List[str]
     email: str
     mail_box: MailBox
+    mobile: str
 
 
 

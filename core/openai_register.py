@@ -333,7 +333,7 @@ class OpenAIRegister:
             await btn_continue.click(humanize=True)
 
             next_element = await tab.query(
-                "//button[@data-dd-action-name='Try again'] | //input[@name='code']",
+                "//button[@data-dd-action-name='Try again'] | //input[@name='code'] ｜ //input[@name='email']",
                 timeout=self._config.default_timeout_seconds,
             )
             if next_element.tag_name == "button":
@@ -345,6 +345,103 @@ class OpenAIRegister:
             return
 
         raise RuntimeError("提交密码失败")
+
+    async def _start_register_by_phone(self, tab: Tab) -> Account:
+        """通过手机号执行 ChatGPT 账号注册。"""
+        if not self._sms_provider:
+            raise RuntimeError("未配置短信服务，无法通过手机号注册")
+
+        await tab.go_to("https://chatgpt.com", timeout=self._config.default_timeout_seconds)
+        LOGGER.info("访问 https://chatgpt.com")
+
+        btn_login = await tab.query("//button[@data-testid='login-button']", timeout=self._config.default_timeout_seconds)
+        await btn_login.wait_until(is_visible=True, is_interactable=True, timeout=10)
+        LOGGER.info("点击登录按钮")
+        await btn_login.click(humanize=True)
+
+        LOGGER.info("等待登录弹框")
+        await tab.query("//div[@role='dialog']", timeout=self._config.default_timeout_seconds)
+
+        btn_phone = await tab.query(
+            "//div[@role='dialog']//button[contains(., '电话号码') or contains(., 'phone number') or contains(., 'Phone number')]",
+            timeout=10,
+        )
+        await btn_phone.wait_until(is_visible=True, is_interactable=True, timeout=10)
+        LOGGER.info("点击使用电话号码继续按钮")
+        await btn_phone.click(humanize=True)
+
+        phone_input = await tab.query("//input[@type='tel']", timeout=self._config.default_timeout_seconds)
+        await phone_input.wait_until(is_visible=True, is_interactable=False, timeout=10)
+
+        account = create_new_account(self._mail_provider.generate_mail_box())
+        if self._config.default_account_password:
+            account.password = self._config.default_account_password
+        birthday_text = "-".join(account.birthday)
+
+        number = self._sms_provider.generate_phone_number()
+        if not number or "phoneNumber" not in number:
+            raise RuntimeError("申请手机号失败")
+        account.mobile = number["phoneNumber"]
+        LOGGER.info(
+            f"生成账号 => mobile=+{account.mobile}, username={account.username}, password={account.password}, birthday={birthday_text}"
+        )
+
+        LOGGER.info(f"输入手机号：+{account.mobile}")
+        input_tel = await tab.query("//input[@type='tel']", timeout=self._config.default_timeout_seconds)
+        await input_tel.wait_until(is_visible=True, is_interactable=True, timeout=5)
+        await input_tel.type_text("+" + account.mobile)
+        await tab.keyboard.press(Key.TAB)
+
+        btn_continue = await tab.query("//button[@type='submit']", timeout=10)
+        await btn_continue.wait_until(is_visible=True, is_interactable=True, timeout=10)
+        LOGGER.info("点击继续按钮")
+        await btn_continue.click(humanize=True)
+
+        await self._try_input_password_and_submit(
+            tab, account.password, password_expression="//input[@name='new-password']"
+        )
+
+        input_code = await tab.query("//input[@name='code']", timeout=self._config.default_timeout_seconds)
+        await input_code.wait_until(is_visible=True, is_interactable=False, timeout=10)
+        LOGGER.info("等待短信验证码")
+
+        try:
+            code = await self._wait_for_sms_code_resend_if_needed(tab, number)
+        except Exception:
+            self._sms_provider.cancel_activation(number)
+            raise
+        if not code:
+            self._sms_provider.cancel_activation(number)
+            raise RuntimeError("获取短信验证码失败")
+
+        LOGGER.info(f"输入短信验证码：{code}")
+        await self._ensure_input(tab, "//input[@name='code']", code)
+
+        btn_continue = await tab.query("//button[@data-dd-action-name='Continue']", timeout=10)
+        await btn_continue.wait_until(is_visible=True, is_interactable=True, timeout=10)
+        LOGGER.info("点击继续按钮")
+        await btn_continue.click(humanize=True)
+
+        input_name = await tab.query("//input[@name='name']", timeout=self._config.default_timeout_seconds)
+        await input_name.wait_until(is_visible=True, is_interactable=False, timeout=10)
+        LOGGER.info(f"输入全名：{account.username}")
+        await self._ensure_input(tab, "//input[@name='name']", account.username)
+
+        input_age = await tab.query("//input[@name='age']", timeout=10)
+        await input_age.wait_until(is_visible=True, is_interactable=False, timeout=5)
+        age = str(date.today().year - int(account.birthday[0]))
+        LOGGER.info(f"输入年龄：{age}")
+        await self._ensure_input(tab, "//input[@name='age']", age)
+
+        btn_finish = await tab.query("//button[@type='submit']", timeout=10)
+        await btn_finish.wait_until(is_visible=True, is_interactable=True, timeout=10)
+        LOGGER.info("点击完成账户创建按钮")
+        await btn_finish.click(humanize=True)
+
+        await pydoll_util.wait_url(tab, url_flags=["https://chatgpt.com"], timeout_sec=self._config.default_timeout_seconds)
+        await asyncio.sleep(1)
+        LOGGER.info("账号注册成功")
+        return account
 
     async def _start_register(self, tab: Tab) -> Account:
         """执行 ChatGPT 账号注册。"""
@@ -562,6 +659,75 @@ class OpenAIRegister:
         LOGGER.info(f"成功获取回调链接：{callback_url}")
         return oauth, callback_url, phone_bypass
 
+    async def _start_oauth_by_phone(self, tab: Tab, account: Account) -> tuple[OAuthStart, str, bool]:
+        """执行 Codex OAuth 流程（手机号登录）。"""
+
+        oauth = openai_register_util.generate_oauth_url(self._config.oauth_client_id, self._config.callback_server_port)
+        LOGGER.info(f"生成 OAuth 授权链接：{oauth.auth_url}")
+
+        LOGGER.info("访问授权链接页面")
+        await tab.go_to(oauth.auth_url, timeout=self._config.default_timeout_seconds)
+        await asyncio.sleep(2)
+
+        phone_login_url = "https://auth.openai.com/log-in?usernameKind=phone_number"
+        LOGGER.info(f"跳转到手机号登录页面：{phone_login_url}")
+        await tab.go_to(phone_login_url, timeout=self._config.default_timeout_seconds)
+
+        phone_input = await tab.query("//input[@type='tel']", timeout=self._config.default_timeout_seconds)
+        await phone_input.wait_until(is_visible=True, is_interactable=False, timeout=10)
+        LOGGER.info(f"输入手机号：+{account.mobile}")
+        await phone_input.type_text("+" + account.mobile)
+
+        btn_continue = await tab.query("//button[@data-dd-action-name='Continue']", timeout=10)
+        await btn_continue.wait_until(is_visible=True, is_interactable=True, timeout=10)
+        LOGGER.info("点击继续按钮")
+        await btn_continue.click(humanize=True)
+
+        await self._try_input_password_and_submit(
+            tab, account.password, password_expression="//input[@name='current-password']"
+        )
+
+        input_email = await tab.query("//input[@name='email']", timeout=self._config.default_timeout_seconds)
+        await input_email.wait_until(is_visible=True, is_interactable=False, timeout=10)
+        LOGGER.info(f"输入邮箱：{account.email}")
+        await self._ensure_input(tab, "//input[@name='email']", account.email)
+
+        received_after = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        btn_continue = await tab.query("//button[@data-dd-action-name='Continue']", timeout=10)
+        await btn_continue.wait_until(is_visible=True, is_interactable=True, timeout=10)
+        LOGGER.info("点击继续按钮")
+        await btn_continue.click(humanize=True)
+
+        input_code = await tab.query("//input[@name='code']", timeout=self._config.default_timeout_seconds)
+        await input_code.wait_until(is_visible=True, is_interactable=False, timeout=10)
+        LOGGER.info("等待验证码")
+
+        code = await self._wait_for_verify_code_resend_if_needed(tab, mail_box=account.mail_box, received_after=received_after)
+        if not code:
+            raise RuntimeError("无法获取验证码")
+
+        LOGGER.info(f"输入验证码：{code}")
+        await self._ensure_input(tab, "//input[@name='code']", code)
+
+        btn_continue = await tab.query("//button[@data-dd-action-name='Continue']", timeout=10)
+        await btn_continue.wait_until(is_visible=True, is_interactable=True, timeout=10)
+        LOGGER.info("点击继续按钮")
+        await btn_continue.click(humanize=True)
+
+        await pydoll_util.wait_url(tab, url_flags=["/codex/consent"], timeout_sec=self._config.default_timeout_seconds)
+        LOGGER.info("到达同意授权页面")
+
+        btn_continue = await tab.query("//button[@data-dd-action-name='Continue']", timeout=10)
+        await btn_continue.wait_until(is_visible=True, is_interactable=True, timeout=10)
+        LOGGER.info("点击继续按钮")
+        await btn_continue.click(humanize=True)
+
+        callback_host = f"localhost:{self._config.callback_server_port}"
+        LOGGER.info("等待回调链接")
+        callback_url = await pydoll_util.wait_url(tab, url_flags=[callback_host], timeout_sec=self._config.default_timeout_seconds)
+        LOGGER.info(f"成功获取回调链接：{callback_url}")
+        return oauth, callback_url, False
+
     @staticmethod
     async def _submit_callback_url(tab: Tab, oauth: OAuthStart, callback_url: str) -> dict[str, Any]:
         """提交 OAuth 回调地址并生成 CPA 授权文件。"""
@@ -637,8 +803,8 @@ class OpenAIRegister:
                 try:
                     tab = await browser.start()
                     await self._prepare_browser_env(tab)
-                    account = await self._start_register(tab)
-                    oauth, callback_url, phone_bypass = await self._start_oauth(tab, account)
+                    account = await self._start_register_by_phone(tab)
+                    oauth, callback_url, phone_bypass = await self._start_oauth_by_phone(tab, account)
                     LOGGER.info("开始提交回调链接")
                     auth_file = await self._submit_callback_url(tab, oauth, callback_url)
                     raw_auth_file = json.dumps(auth_file, indent=2, ensure_ascii=False)
