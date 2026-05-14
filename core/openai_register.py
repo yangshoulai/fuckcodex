@@ -726,7 +726,7 @@ class OpenAIRegister:
         LOGGER.info("等待回调链接")
         callback_url = await pydoll_util.wait_url(tab, url_flags=[callback_host], timeout_sec=self._config.default_timeout_seconds)
         LOGGER.info(f"成功获取回调链接：{callback_url}")
-        return oauth, callback_url, False
+        return oauth, callback_url, True
 
     @staticmethod
     async def _submit_callback_url(tab: Tab, oauth: OAuthStart, callback_url: str) -> dict[str, Any]:
